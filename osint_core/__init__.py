@@ -16,7 +16,7 @@ from .constants import (
 from .net import (Fetcher, build_session, polite, strip_tags, valid_proxy,
                   warn_if_dns_leaking)
 from .cli import add_common_args, fetcher_from_args, save_report
-from .search import dork, search_bing, search_ddg
+from .search import dork, google_creds, search_bing, search_ddg, search_google
 from .probe import classify, page_title, probe
 from .sources import gravatar, hudson_rock, leakcheck, wayback_cdx
 from .breach import (
@@ -106,7 +106,7 @@ __all__ = [
     "Fetcher", "build_session", "polite", "strip_tags", "valid_proxy",
     "warn_if_dns_leaking",
     "add_common_args", "fetcher_from_args", "save_report",
-    "dork", "search_bing", "search_ddg",
+    "dork", "google_creds", "search_bing", "search_ddg", "search_google",
     "classify", "page_title", "probe",
     "gravatar", "hudson_rock", "leakcheck", "wayback_cdx",
     "breach_search", "detect_qtype", "get_api_keys",
