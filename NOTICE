@@ -1,0 +1,20 @@
+OHOsint
+Copyright (c) 2026 omar-hadf
+
+This product is licensed under the MIT License; see LICENSE.
+
+Third-party dependencies retain their own licenses. Note in particular:
+
+  stem (https://stem.torproject.org/) is licensed under the LGPL v3.
+  It is used as an unmodified, separately-installed library (imported at
+  runtime for the Tor `newnym` circuit-rotation command) and is not
+  vendored, modified, or statically linked into this project. Its copyleft
+  terms therefore apply to stem itself, not to this project's source.
+
+Remaining dependencies (requests, phonenumbers, aiohttp, aiohttp-socks,
+aiodns, curl_cffi, rich, safe-pysha3) are MIT, Apache-2.0, BSD, PSFL, or
+CC0 licensed.
+
+The optional site databases are supplied by the maigret and
+sherlock-project packages, both MIT licensed, and are not redistributed
+here.
