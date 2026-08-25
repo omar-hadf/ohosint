@@ -20,6 +20,9 @@ Install both via: `pip install -e .[sweep]`
 - `OHO_RAPIDAPI_KEY` — BreachDirectory (RapidAPI)
 - `OHO_EMAILREP_KEY` — EmailRep (higher quota than keyless)
 
+**Optional (search engine API keys — same env/`.env` convention):**
+- `OHO_GOOGLE_KEY` + `OHO_GOOGLE_CX` — both required; adds a `google` engine to `dork()` via the official Custom Search JSON API (no scraping, 100 free queries/day). Unset ⇒ engine list stays DuckDuckGo + Bing.
+
 ## Architecture
 
 ```
@@ -85,6 +88,6 @@ Lint with `ruff check .` (config in `pyproject.toml`). CI runs lint, a
 
 - Scripts import `osint_core` via `sys.path` manipulation, not as an installed package. Don't add absolute imports that assume a different layout.
 - `phonenumbers` is optional at runtime (graceful fallback with raw normalization), but recommended for full phone analysis.
-- Search engines aggressively rate-limit Tor/datacenter IPs. If dorks return `junk`/`empty`/`None` for all engines, the agent should suggest rotating the Tor circuit (`newnym`) or waiting.
+- Search engines aggressively rate-limit Tor/datacenter IPs. If dorks return `junk`/`empty`/`None` for all engines, the agent should suggest rotating the Tor circuit (`newnym`) or waiting. The keyed `google` engine is the exception — it's the official Custom Search JSON API, so it's quota-capped (100/day free) instead of CAPTCHA-throttled.
 - `requests[socks]` (with PySocks) is required for SOCKS5 proxy support. A bare `requests` install will fail silently on proxy URLs.
 - Site databases (`maigret`, `sherlock-project`) are optional. Without them, `ohosint username`/`email` commands fail with a clear error instead of silently returning 0 results.

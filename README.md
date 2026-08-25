@@ -68,7 +68,7 @@ ohosint/
 ├── osint_core/                 # shared library (single source of truth)
 │   ├── constants.py            #   user-agents, not-found markers, platform URL templates
 │   ├── net.py                  #   Fetcher: session, UA rotation, delays, proxy
-│   ├── search.py                #   DuckDuckGo + Bing dorking
+│   ├── search.py                #   DuckDuckGo + Bing dorking, optional Google CSE engine
 │   ├── probe.py                #   sync profile probing (used by skills/)
 │   ├── async_check.py          #   async site-checking engine (used by ohosint)
 │   ├── site_db.py              #   Maigret/Sherlock site-database loader
@@ -169,6 +169,22 @@ export OHO_INTELX_KEY=...        # Intelligence X free account API
 export OHO_RAPIDAPI_KEY=...      # BreachDirectory (RapidAPI)
 export OHO_EMAILREP_KEY=...      # EmailRep higher-quota tier
 ```
+
+### Optional: Google dorking (env vars only)
+
+The `dork` shell command scrapes DuckDuckGo + Bing by default. Set both of
+these to add a real **Google** engine via the official
+[Custom Search JSON API](https://programmablesearchengine.google.com/) —
+every Google operator (`site:`, `filetype:`, `intitle:`, `inurl:`, …) works,
+and it's a sanctioned API rather than scraping, so no CAPTCHAs. Free tier is
+100 queries/day:
+
+```bash
+export OHO_GOOGLE_KEY=...        # Google Cloud API key (Custom Search enabled)
+export OHO_GOOGLE_CX=...         # Programmable Search Engine ID (cx)
+```
+
+Without both set, the engine list stays DuckDuckGo + Bing and nothing changes.
 
 ### Optional: Tor
 
