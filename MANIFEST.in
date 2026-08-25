@@ -1,0 +1,20 @@
+include README.md
+include LICENSE
+include NOTICE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include SECURITY.md
+include CODE_OF_CONDUCT.md
+include requirements.txt
+include .env.example
+recursive-include docs *.md
+recursive-include tests *.py
+
+# Never ship runtime output or local secrets in a source distribution.
+exclude .env
+global-exclude *_report_*.json
+global-exclude *_breach_*.json
+global-exclude *.pyc
+prune .pytest_cache
+prune build
+prune dist

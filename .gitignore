@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Test / lint / type-checker caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Generated recon / breach reports.
+# These contain investigation targets' personal data, and breach reports can
+# contain real leaked email:password pairs. Never commit them.
+# See README.md -> "Reports".
+*_report_*.json
+*_breach_*.json
+report.json
+out.json
+
+# Local API keys
+.env
+.env.*
+!.env.example

@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "osint-core"
+version = "0.1.0"
+description = "Passive OSINT toolkit for email, phone, username, and name investigation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "omar-hadf" }]
+keywords = ["osint", "passive-osint", "username", "breach", "tor", "recon", "security"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+dependencies = [
+    "requests[socks]>=2.28",
+    "phonenumbers>=8.13",
+    "aiohttp>=3.9",
+    "aiohttp-socks>=0.8",
+    "aiodns>=3.2",
+    "curl_cffi>=0.5",
+    "rich>=13.0",
+    "stem>=1.8",
+    "safe-pysha3>=1.0.4",
+]
+
+[project.urls]
+Homepage = "https://github.com/omar-hadf/ohosint"
+Repository = "https://github.com/omar-hadf/ohosint"
+Issues = "https://github.com/omar-hadf/ohosint/issues"
+
+[project.optional-dependencies]
+maigret = ["maigret"]
+sherlock = ["sherlock-project"]
+sweep = ["maigret", "sherlock-project"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "ruff>=0.4"]
+
+[project.scripts]
+ohosint = "ohosint.cli:main"
+
+[tool.setuptools]
+packages = ["osint_core", "ohosint"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
