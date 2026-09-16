@@ -1,8 +1,9 @@
 """Tests for the autopsy command proxy behaviour."""
 
-from unittest.mock import patch, MagicMock
-from ohosint.shell import OHOsintShell
+from unittest.mock import MagicMock, patch
+
 from ohosint.config import Config
+from ohosint.shell import OHOsintShell
 from osint_core.net import Fetcher
 
 

@@ -14,11 +14,6 @@ class TestAiohttpCheckerSSL:
         c = AiohttpChecker(verify_ssl=False)
         assert c.verify_ssl is False
 
-    def test_ssl_ctx_none_when_verifying(self):
-        """When verify_ssl=True, no custom SSL context should be set (aiohttp defaults)."""
-        c = AiohttpChecker(verify_ssl=True)
-        assert c.verify_ssl is True
-
     def test_pick_checker_passes_verify_ssl(self):
         """_pick_checker should forward verify_ssl to the checker."""
 

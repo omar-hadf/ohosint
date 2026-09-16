@@ -1,6 +1,5 @@
 """Tests for the Google Custom Search engine in osint_core.search."""
 
-import osint_core.search as search
 from osint_core.search import dork, google_creds, search_google
 
 

@@ -20,10 +20,25 @@ from datetime import datetime, timezone
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from osint_core import (  # noqa: E402
-    PHONE_TYPE, PLATFORMS, QUICK_SITES, VERDICT_MARK,
-    Fetcher, valid_proxy, dork, probe, gravatar, hudson_rock, leakcheck,
-    generate_candidates, split_email, add_common_args, save_report,
-    page_title, cross_links, page_emails, at_handles,
+    PHONE_TYPE,
+    PLATFORMS,
+    QUICK_SITES,
+    VERDICT_MARK,
+    Fetcher,
+    add_common_args,
+    at_handles,
+    cross_links,
+    dork,
+    generate_candidates,
+    gravatar,
+    hudson_rock,
+    leakcheck,
+    page_emails,
+    page_title,
+    probe,
+    save_report,
+    split_email,
+    valid_proxy,
 )
 
 

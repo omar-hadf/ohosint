@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "omar-hadf" }]
-keywords = ["osint", "passive-osint", "username", "breach", "tor", "recon", "security"]
+keywords = ["osint", "passive-osint", "username", "breach", "tor", "recon", "security", "mcp", "model-context-protocol"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -45,13 +45,15 @@ Issues = "https://github.com/omar-hadf/ohosint/issues"
 maigret = ["maigret"]
 sherlock = ["sherlock-project"]
 sweep = ["maigret", "sherlock-project"]
-dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "ruff>=0.4"]
+mcp = ["fastmcp>=2.0"]
+dev = ["pytest>=7.0", "pytest-asyncio>=0.21", "ruff>=0.4", "fastmcp>=2.0"]
 
 [project.scripts]
 ohosint = "ohosint.cli:main"
+ohosint-mcp = "ohosint_mcp.server:main"
 
 [tool.setuptools]
-packages = ["osint_core", "ohosint"]
+packages = ["osint_core", "ohosint", "ohosint_mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

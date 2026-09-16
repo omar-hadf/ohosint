@@ -6,6 +6,15 @@ this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **MCP server (`ohosint_mcp/`)** — exposes the OSINT engine as an MCP server
+  (`fastmcp`, stdio): 25 tools (`osint_plan`, `run_investigation`, granular
+  per-identifier tools, OPSEC controls), the `skills/*/SKILL.md` manifests as
+  resources, and planning/automation prompts. Engine `print()` output is
+  captured into a `logs` field so it cannot corrupt the stdio transport. New
+  console script `ohosint-mcp` and `fastmcp.json` config.
+
 ### Fixed
 
 - **Username sweeps no longer report false positives.** The Maigret site

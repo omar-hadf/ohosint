@@ -7,3 +7,6 @@ curl_cffi>=0.5
 rich>=13.0
 stem>=1.8
 safe-pysha3>=1.0.4
+
+# Optional: MCP server (pip install fastmcp  or  pip install -e .[mcp])
+# fastmcp>=2.0

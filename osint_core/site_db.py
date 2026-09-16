@@ -142,6 +142,8 @@ class MaigretSite:
         # Sherlock uses "username_claimed"
         if "username_claimed" in data:
             self.username_claimed = data["username_claimed"]
+        if "alexaRank" in data:
+            self.alexa_rank = data["alexaRank"]
 
         if isinstance(self.tags, str):
             self.tags = [self.tags]

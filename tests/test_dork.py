@@ -1,8 +1,9 @@
 """Tests for the dork command in ohosint shell."""
 
 from unittest.mock import patch
-from ohosint.shell import OHOsintShell
+
 from ohosint.config import Config
+from ohosint.shell import OHOsintShell
 
 
 class TestDoDork:

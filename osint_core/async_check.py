@@ -115,7 +115,7 @@ class AiohttpChecker(BaseChecker):
 
     async def check(self) -> Tuple[Optional[str], int, Optional[str]]:
         try:
-            from aiohttp import ClientSession, TCPConnector, ClientTimeout
+            from aiohttp import ClientSession, ClientTimeout, TCPConnector
             from aiohttp.client_exceptions import ClientConnectorError, ServerDisconnectedError
         except ImportError:
             return None, 0, "aiohttp not installed"
@@ -191,7 +191,7 @@ class CurlCffiChecker(BaseChecker):
             return None, 0, "curl_cffi not installed"
 
         try:
-            async with AsyncSession() as session:
+            async with AsyncSession(proxy=self.proxy) as session:
                 kwargs: Dict[str, Any] = {
                     "url": self.url,
                     "headers": self.headers or {"User-Agent": _random_ua()},
@@ -332,7 +332,14 @@ def classify_result(
     if result_status is None:
         result_status = ScanStatus.UNKNOWN
 
-    return ScanResult(status=result_status, site_name=site_name, url=url)
+    result = ScanResult(status=result_status, site_name=site_name, url=url)
+    if result_status == ScanStatus.CLAIMED and not presense_strs:
+        # The site declared no presence markers, so "claimed" rests solely on a
+        # 200 with no absence marker — the classic false-positive family
+        # (Apple, Wikipedia, GitHub Gist, Discord). Flag it as unconfirmed so
+        # callers can demand search-index corroboration before trusting it.
+        result.confidence = "low"
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -340,8 +347,23 @@ def classify_result(
 # ---------------------------------------------------------------------------
 
 def _pick_checker(site, proxy: Optional[str] = None, verify_ssl: bool = True) -> BaseChecker:
-    """Select the appropriate checker backend for a site."""
+    """Select the appropriate checker backend for a site.
+
+    ``socks5h://`` routes DNS through the proxy and is the OPSEC-recommended
+    scheme, but ``aiohttp_socks`` only accepts ``socks5``/``socks4``/``http``.
+    libcurl (via ``curl_cffi``) accepts ``socks5h``, so prefer it when the
+    scheme is present; otherwise rewrite to ``socks5`` with an explicit warning
+    that DNS will resolve locally.
+    """
     protection = getattr(site, "protection", [])
+    if proxy and proxy.startswith("socks5h"):
+        from .impersonate import is_available
+        if is_available():
+            return CurlCffiChecker(proxy=proxy)
+        logger.warning(
+            "curl_cffi unavailable; rewriting %s -> socks5:// for aiohttp "
+            "(DNS will resolve locally and leak outside the proxy)", proxy)
+        proxy = proxy.replace("socks5h://", "socks5://", 1)
     if "tls_fingerprint" in protection:
         from .impersonate import is_available
         if is_available():
@@ -443,6 +465,44 @@ async def check_username_on_sites(
         on_done: optional callback(completed_count, total_count, result) called
                  after each site check completes, for progress reporting.
     """
+    results, _ = await _run_sweep(sites, username, proxy, timeout, in_parallel,
+                                  skip_nsfw, verify_ssl, on_done, budget=None)
+    return results
+
+
+async def check_username_on_sites_budget(
+    sites: Dict[str, Any],
+    username: str,
+    proxy: Optional[str] = None,
+    timeout: float = 10,
+    in_parallel: int = 20,
+    skip_nsfw: bool = False,
+    verify_ssl: bool = True,
+    budget: float = 60.0,
+    on_done=None,
+) -> Tuple[List[ScanResult], bool]:
+    """Like `check_username_on_sites`, but returns ``(results, truncated)``.
+
+    When `budget` (wall-clock seconds) is exceeded, pending checks are cancelled
+    and the completed results are returned with ``truncated=True`` so the caller
+    can report partial progress instead of dropping everything.
+    """
+    return await _run_sweep(sites, username, proxy, timeout, in_parallel,
+                            skip_nsfw, verify_ssl, on_done, budget=budget)
+
+
+async def _run_sweep(
+    sites: Dict[str, Any],
+    username: str,
+    proxy: Optional[str],
+    timeout: float,
+    in_parallel: int,
+    skip_nsfw: bool,
+    verify_ssl: bool,
+    on_done,
+    budget: Optional[float],
+) -> Tuple[List[ScanResult], bool]:
+    """Shared sweep engine: per-site isolation + optional wall-clock budget."""
     sem = asyncio.Semaphore(in_parallel)
     total = len([s for s in sites.values()
                  if not getattr(s, "disabled", False)
@@ -452,7 +512,14 @@ async def check_username_on_sites(
     async def _limited_check(site):
         nonlocal completed
         async with sem:
-            result = await check_site(site, username, proxy=proxy, timeout=timeout, verify_ssl=verify_ssl)
+            try:
+                result = await check_site(site, username, proxy=proxy,
+                                          timeout=timeout, verify_ssl=verify_ssl)
+            except Exception as exc:
+                # A connector-level failure (e.g. an unsupported proxy scheme)
+                # must degrade to a per-site error rather than aborting the
+                # whole sweep and discarding already-completed results.
+                result = _isolated_error(site, username, exc)
             completed += 1
             if on_done:
                 on_done(completed, total, result)
@@ -464,9 +531,31 @@ async def check_username_on_sites(
             continue
         if skip_nsfw and getattr(site, "is_nsfw", False):
             continue
-        tasks.append(_limited_check(site))
+        tasks.append(asyncio.ensure_future(_limited_check(site)))
 
-    return list(await asyncio.gather(*tasks, return_exceptions=False))
+    if budget is not None:
+        done, pending = await asyncio.wait(tasks, timeout=budget)
+        truncated = bool(pending)
+        for p in pending:
+            p.cancel()
+        results = [t.result() for t in done]
+    else:
+        results = await asyncio.gather(*tasks)
+        truncated = False
+    return results, truncated
+
+
+def _isolated_error(site, username: str, exc: Exception) -> ScanResult:
+    """Turn a per-site failure into an UNKNOWN ScanResult instead of raising."""
+    site_name = getattr(site, "pretty_name", getattr(site, "name", ""))
+    try:
+        url = site.build_probe_url(username)
+    except Exception:
+        url = ""
+    return ScanResult.error(
+        f"{type(exc).__name__}: {exc}", site_name=site_name, url=url,
+        username=username,
+    )
 
 
 def check_username_sync(

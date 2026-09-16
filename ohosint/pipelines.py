@@ -90,6 +90,71 @@ def run_username_pipeline(
     )
 
 
+def limit_sites(sites: Dict[str, oc.MaigretSite], max_sites: Optional[int]) -> Dict[str, oc.MaigretSite]:
+    """Return the top-N sites by popularity (Alexa rank) when `max_sites` is set.
+
+    Sites without a rank sort to the end. Keeps sweeps bounded and fast by
+    default without hard-coding a site list.
+    """
+    if not max_sites or max_sites <= 0:
+        return sites
+
+    def _rank(site):
+        r = getattr(site, "alexa_rank", None)
+        return r if isinstance(r, (int, float)) else float("inf")
+
+    ordered = sorted(sites.items(), key=lambda kv: _rank(kv[1]))
+    return dict(ordered[:max_sites])
+
+
+def run_username_pipeline_bounded(
+    username: str,
+    sites: Dict[str, oc.MaigretSite],
+    proxy: Optional[str] = None,
+    timeout: float = 10.0,
+    in_parallel: int = 20,
+    skip_nsfw: bool = True,
+    verify_ssl: bool = True,
+    apply_exclusions: bool = True,
+    max_sites: Optional[int] = None,
+    budget: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Run a bounded username sweep, returning partial results on timeout.
+
+    Unlike `run_username_pipeline` (which returns a bare list), this returns a
+    dict with ``results``, ``truncated`` (bool), and counts, so an MCP client
+    gets partial progress instead of a hard failure when the sweep is large.
+    """
+    if apply_exclusions:
+        try:
+            exclusions = oc.fetch_exclusions(proxy=proxy)
+            sites = oc.filter_excluded_sites(sites, exclusions=exclusions)
+        except Exception as e:
+            logger.warning("Failed to apply exclusions: %s", e)
+
+    sites = limit_sites(sites, max_sites)
+
+    results, truncated = asyncio.run(
+        oc.check_username_on_sites_budget(
+            sites,
+            username,
+            proxy=proxy,
+            timeout=timeout,
+            in_parallel=in_parallel,
+            skip_nsfw=skip_nsfw,
+            verify_ssl=verify_ssl,
+            budget=budget,
+        )
+    )
+    return {
+        "username": username,
+        "results": results,
+        "truncated": truncated,
+        "total_sites": len(sites),
+        "checked": len(results),
+    }
+
+
 def run_email_pipeline(
     email: str,
     sites: Optional[Dict[str, oc.MaigretSite]] = None,
@@ -172,7 +237,14 @@ def run_email_pipeline(
             return results
 
         print(f"  Sweeping {total} candidates across {total_sites} sites...")
-        report["results"] = asyncio.run(_sweep_all())
+        try:
+            report["results"] = asyncio.run(_sweep_all())
+        except Exception as e:
+            # A sweep crash (bad proxy scheme, timeout) must never discard the
+            # breach/Gravatar source lookups that already completed. Report the
+            # sweep failure alongside the intact source data.
+            logger.warning("Username sweep failed: %s", e)
+            report["sweep_error"] = f"{type(e).__name__}: {e}"
 
     return report
 
@@ -224,14 +296,21 @@ def run_phone_pipeline(phone: str) -> Dict[str, Any]:
     return report
 
 
-def run_name_pipeline(first: str, last: Optional[str] = None, year: Optional[int] = None) -> Dict[str, Any]:
+def run_name_pipeline(first: str, last: Optional[str] = None, year: Optional[int] = None,
+                      fetcher=None) -> Dict[str, Any]:
     """Run name-based dorking and candidate generation.
+
+    Args:
+        fetcher: optional Fetcher; when provided, a Wikipedia lookup adds
+            public-figure disambiguation (an exact-title match means generic
+            social hits are likely about the famous person, not the target).
 
     Returns a dict with:
         - name: full name
         - slug: URL slug
         - candidates: username candidates
         - dorks: search queries
+        - wikipedia / public_figure_collision (only when fetcher given)
     """
     full = f"{first} {last}".strip() if last else first
     report = {"name": full, "candidates": [], "dorks": []}
@@ -262,6 +341,15 @@ def run_name_pipeline(first: str, last: Optional[str] = None, year: Optional[int
         "facebook": f'site:facebook.com "{full}"',
         "adult": f'"{full}" "profile"',
     }
+
+    # Public-figure disambiguation (needs one GET)
+    if fetcher is not None:
+        try:
+            entries = oc.wikipedia_lookup(fetcher, full)
+            report["wikipedia"] = entries or []
+            report["public_figure_collision"] = oc.famous_collision(entries, full)
+        except Exception as e:
+            logger.debug("Wikipedia lookup failed: %s", e)
 
     return report
 

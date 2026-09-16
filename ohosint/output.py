@@ -17,6 +17,7 @@ except ImportError:
 
 from osint_core.scan_result import ScanResult
 
+
 def _write_private(path: str, text: str) -> None:
     """Write ``text`` to ``path`` with owner-only (0600) permissions.
 

@@ -1,7 +1,7 @@
 """Tests for proxy invalidation in ohosint shell (issue #1/#3)."""
 
-from ohosint.shell import OHOsintShell
 from ohosint.config import Config
+from ohosint.shell import OHOsintShell
 
 
 class TestFetcherInvalidation:

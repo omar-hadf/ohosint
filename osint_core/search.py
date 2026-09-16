@@ -71,6 +71,28 @@ def _bing_decode(url):
         return url
 
 
+def _query_tokens(query):
+    """Lowercase alphanumeric tokens (length >= 3) that a relevant hit must echo."""
+    return set(re.findall(r"[a-z0-9]{3,}", (query or "").lower()))
+
+
+def _relevant(hits, query):
+    """Drop results sharing zero tokens with the query.
+
+    Bing (and DDG) return near-zero-relevance pages for many dorks; a hit whose
+    title and URL share no token with the query is noise, not a lead.
+    """
+    tokens = _query_tokens(query)
+    if not tokens:
+        return hits
+    kept = []
+    for h in hits:
+        text = (h.get("title", "") + " " + h.get("url", "")).lower()
+        if tokens & set(re.findall(r"[a-z0-9]{3,}", text)):
+            kept.append(h)
+    return kept
+
+
 def search_ddg(fetcher, query):
     r = fetcher.get("https://html.duckduckgo.com/html/", data={"q": query})
     if r is None or r.status_code in (202, 403) or "anomaly" in r.text.lower()[:800]:
@@ -107,6 +129,9 @@ def search_bing(fetcher, query):
             if re.match(r"^https?://(?!www\.bing\.com/search)", url) \
                     and title and "http" not in title[:12]:
                 hits.append({"engine": "bing", "url": url, "title": title})
+    hits = _relevant(hits, query)
+    if not hits:
+        return "junk", hits
     if len(hits) >= 5:
         domains = {re.sub(r"^https?://(www\.)?", "", h["url"]).split("/")[0].split(".")[0]
                    for h in hits}
@@ -175,6 +200,11 @@ def dork(fetcher, query):
         if h["url"] not in seen:
             seen.add(h["url"])
             uniq.append(h)
+    # Relevance guard across every engine: a hit that shares no token with the
+    # query (title or URL) is noise, not a lead. Bing applies this per-engine;
+    # doing it here also covers DDG and Google, which otherwise surface
+    # unrelated pages for exact-match email/handle dorks (see BUG-010/018).
+    uniq = _relevant(uniq, query)
     flag = ""
     if all(states.get(n) in ("junk", None, "empty") for n, _ in engines):
         flag = "   <-- engines throttled; run 'newnym' (tor circuit) or wait"

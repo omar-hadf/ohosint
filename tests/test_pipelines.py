@@ -1,7 +1,8 @@
 """Tests for pipeline verify_ssl threading (issue #4)."""
 
-from unittest.mock import patch, MagicMock, AsyncMock
-from ohosint.pipelines import run_username_pipeline, run_email_pipeline, run_breach_pipeline
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from ohosint.pipelines import run_breach_pipeline, run_email_pipeline, run_username_pipeline
 
 
 class TestVerifySSLThreading:

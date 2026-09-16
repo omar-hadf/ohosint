@@ -6,6 +6,7 @@ import shlex
 from typing import List
 
 import osint_core as oc
+
 from . import __version__
 from .config import Config
 from .output import OutputFormatter, make_report_path
@@ -179,10 +180,13 @@ OHOsint v{__version__} — type help or ? to list commands.
             idx = args.index("--year")
             if idx + 1 < len(args):
                 year = int(args[idx + 1])
-        report = run_name_pipeline(first, last, year)
+        report = run_name_pipeline(first, last, year, fetcher=self._fetcher())
         print(f"\nName: {report['name']}")
         print(f"Slug: {report['slug']}")
         print(f"Candidates: {', '.join(report['candidates'])}")
+        if report.get("public_figure_collision"):
+            print("  [!] exact Wikipedia title match — this name collides with a "
+                  "public figure; treat generic social hits with suspicion")
         self.config.candidate_handles.extend(report["candidates"])
 
     def do_sweep(self, line):
@@ -228,6 +232,122 @@ OHOsint v{__version__} — type help or ? to list commands.
             print(f"  {h}")
         if flag:
             print(flag)
+
+    def do_domain(self, line):
+        """domain <domain> — passive subdomain enumeration (crt.sh/hackertarget/OTX)."""
+        args = self._parse_args(line, 1)
+        if not args:
+            return
+        try:
+            report = oc.enum_subdomains(self._fetcher(), args[0])
+        except ValueError as e:
+            print(f"Error: {e}")
+            return
+        print(f"\nDomain: {report['domain']}")
+        print(f"Sources: {report['sources']}")
+        for e in report["errors"]:
+            print(f"  [!] {e}")
+        subs = report["subdomains"]
+        print(f"Subdomains: {len(subs)}")
+        for s in subs[:40]:
+            print(f"  {s}")
+        if len(subs) > 40:
+            print(f"  ... and {len(subs) - 40} more (save to see all)")
+
+    def do_docs(self, line):
+        """docs <domain|name> — hunt exposed files with a filetype dork pack."""
+        if not line.strip():
+            print("Usage: docs <domain|name>")
+            return
+        report = oc.hunt_docs(self._fetcher(), line.strip())
+        print(f"\nDocs hunt: {report['target']}")
+        total = 0
+        for entry in report["results"]:
+            hits = entry["hits"]
+            total += len(hits)
+            note = "  <-- engines throttled" if entry["throttled"] else ""
+            print(f"\n[{entry['label']}] {entry['query']}{note}")
+            for h in hits[:5]:
+                print(f"  {h['url']}  ({h['engine']})")
+        print(f"\nTotal hits: {total}")
+
+    def do_onion(self, line):
+        """onion <query> — dark-web search via Ahmia (open results with Tor)."""
+        if not line.strip():
+            print("Usage: onion <query>")
+            return
+        state, hits = oc.search_onion(self._fetcher(), line.strip())
+        print(f"\nAhmia state: {state}")
+        for h in hits[:15]:
+            print(f"  {h['title']}\n    {h['url']}")
+        if state is None:
+            print("  (request failed — try 'newnym' or check your connection)")
+
+    def do_github(self, line):
+        """github <query> — search GitHub code/commits/users for leaks."""
+        if not line.strip():
+            print("Usage: github <email|username>")
+            return
+        report = oc.github_leaks(self._fetcher(), line.strip())
+        print(f"\nGitHub: {report['query']}  (token: {'yes' if report['keyed'] else 'no'})")
+        for e in report["errors"]:
+            print(f"  [!] {e}")
+        for section in ("code", "commits", "users"):
+            hits = report[section]
+            if not hits:
+                continue
+            print(f"\n{section}:")
+            for h in hits[:10]:
+                where = h.get("repo") or h.get("login", "")
+                print(f"  {h['url']}  {where}")
+
+    def do_suggest(self, line):
+        """suggest <query> — search-engine autocomplete pivots."""
+        if not line.strip():
+            print("Usage: suggest <query>")
+            return
+        out = oc.suggest(self._fetcher(), line.strip())
+        print(f"\nSuggestions ({len(out['merged'])}):")
+        for s in out["merged"][:15]:
+            print(f"  {s}")
+
+    def do_mentions(self, line):
+        """mentions <query> — who is talking about this identifier (reddit/SE)."""
+        if not line.strip():
+            print("Usage: mentions <query>")
+            return
+        out = oc.mentions(self._fetcher(), line.strip())
+        for name, hits in out.items():
+            if hits is None:
+                print(f"\n[{name}] request failed")
+                continue
+            print(f"\n[{name}] {len(hits)} mention(s)")
+            for h in hits[:8]:
+                extra = h.get("subreddit") or f"score {h.get('score', 0)}"
+                print(f"  {h['title']}  ({extra})\n    {h['url']}")
+
+    def do_autodork(self, line):
+        """autodork <url> [anchor...] — keywords from a page -> targeted dorks."""
+        args = self._parse_args(line, 1)
+        if not args:
+            return
+        url = args[0]
+        if not url.startswith("http"):
+            print("Error: need a full URL starting with http(s)://")
+            return
+        r = self._fetcher().get(url)
+        if r is None or r.status_code != 200:
+            print("  unreachable")
+            return
+        anchors = args[1:] or list(self.config.candidate_handles)[:5]
+        anchors += [str(v) for v in self.config.identifiers.values()
+                    if isinstance(v, str)][:5]
+        keywords = oc.extract_keywords(r.text)
+        print(f"\nKeywords: {', '.join(kw for kw, _ in keywords)}")
+        queries = oc.auto_dorks(r.text, anchors)
+        print(f"Auto-dorks ({len(queries)}):")
+        for q in queries[:12]:
+            print(f"  {q}")
 
     def do_autopsy(self, line):
         """autopsy <url> — harvest links, emails, and handles from a profile page."""
@@ -374,6 +494,13 @@ OHOsint v{__version__} — type help or ? to list commands.
         print("  name <first> [last]          generate candidates from a name")
         print("  sweep                        probe all generated candidates")
         print("  dork <query>                 search-engine dork")
+        print("  domain <domain>              passive subdomain enumeration")
+        print("  docs <domain|name>           exposed-files dork pack")
+        print("  onion <query>                dark-web search via Ahmia")
+        print("  github <query>               GitHub code/commit/user leak search")
+        print("  suggest <query>              autocomplete pivots")
+        print("  mentions <query>             reddit/stackexchange mentions")
+        print("  autodork <url> [anchor...]   keywords from a page -> dorks")
         print("  autopsy <url>                harvest profile page")
         print("  pivot                        extract pivots from results")
         print("  proxy <url|off>              set/clear proxy")

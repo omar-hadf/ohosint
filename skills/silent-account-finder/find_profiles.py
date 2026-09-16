@@ -14,9 +14,16 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from osint_core import (  # noqa: E402
-    PLATFORMS, VERDICT_MARK,
-    add_common_args, fetcher_from_args, save_report,
-    dork, probe, leakcheck, simple_candidates, split_email,
+    PLATFORMS,
+    VERDICT_MARK,
+    add_common_args,
+    dork,
+    fetcher_from_args,
+    leakcheck,
+    probe,
+    save_report,
+    simple_candidates,
+    split_email,
 )
 
 PROFILE_SITES = ["xnxx", "xvideos"]

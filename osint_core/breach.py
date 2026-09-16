@@ -364,7 +364,11 @@ def breach_xon_password(fetcher, password):
 
 
 def breach_proxynova(fetcher, query, limit=100):
-    """ProxyNova COMB: plaintext email:password lines (3.2B records, keyless)."""
+    """ProxyNova COMB: plaintext email:password lines (3.2B records, keyless).
+
+    Results are filtered to lines that contain the query token (a COMB lookup
+    returns unrelated records for common local-parts) and capped at `limit`.
+    """
     res = {"found": None, "count": 0, "lines": [], "note": ""}
     r = fetcher.get("https://api.proxynova.com/comb",
                     params={"query": query, "start": 0, "limit": limit})
@@ -376,10 +380,16 @@ def breach_proxynova(fetcher, query, limit=100):
         return res
     try:
         j = r.json()
-        lines = [str(x) for x in (j.get("lines") or [])]
-        res["lines"] = lines[:limit]
-        res["count"] = j.get("count") or len(lines)
-        res["found"] = bool(lines)
+        raw = [str(x) for x in (j.get("lines") or [])]
+        token = (query or "").strip().lower()
+        relevant = [ln for ln in raw if token and token in ln.lower()] or raw
+        res["lines"] = relevant[:limit]
+        res["count"] = len(relevant)
+        res["found"] = bool(relevant)
+        if len(relevant) > limit:
+            res["note"] = f"{len(relevant)} relevant lines; showing first {limit}"
+    except ValueError:
+        res["note"] = "non-JSON response (blocked or HTML error page)"
     except Exception as e:
         res["note"] = str(e)[:100]
     return res
@@ -407,6 +417,8 @@ def breach_emailrep(fetcher, email, key=None):
         res["data_breach"] = details.get("data_breach")
         res["profiles"] = details.get("profiles") or []
         res["found"] = bool(res["credentials_leaked"] or res["data_breach"])
+    except ValueError:
+        res["note"] = "non-JSON response (blocked or HTML error page)"
     except Exception as e:
         res["note"] = str(e)[:100]
     return res

@@ -18,9 +18,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 
 from osint_core import (  # noqa: E402
     PLATFORMS,
-    add_common_args, fetcher_from_args, save_report,
-    search_ddg, probe, hudson_rock, wayback_cdx, second_wave_candidates,
-    split_email, page_title, cross_links, page_emails, at_handles,
+    add_common_args,
+    at_handles,
+    cross_links,
+    fetcher_from_args,
+    hudson_rock,
+    page_emails,
+    page_title,
+    probe,
+    save_report,
+    search_ddg,
+    second_wave_candidates,
+    split_email,
+    wayback_cdx,
 )
 
 SIBLING_SITES = ["xnxx", "pornhub", "xhamster", "redtube"]

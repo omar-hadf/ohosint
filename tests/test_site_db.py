@@ -35,8 +35,8 @@ class TestEmptySiteDB:
 
     def test_shell_load_sites_returns_empty_dict(self, capsys):
         """Shell _load_sites catches ValueError and returns {}."""
-        from ohosint.shell import OHOsintShell
         from ohosint.config import Config
+        from ohosint.shell import OHOsintShell
 
         sh = OHOsintShell(Config())
         p1, p2 = self._patch_no_dbs()
@@ -48,8 +48,8 @@ class TestEmptySiteDB:
 
     def test_shell_email_aborts_on_empty_sites(self, capsys):
         """Shell do_email aborts early when no sites loaded."""
-        from ohosint.shell import OHOsintShell
         from ohosint.config import Config
+        from ohosint.shell import OHOsintShell
 
         sh = OHOsintShell(Config())
         p1, p2 = self._patch_no_dbs()

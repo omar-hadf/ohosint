@@ -6,11 +6,14 @@
 
 A collection of **passive, target-never-notified** OSINT tools for
 investigating an email, phone number, name, or username. Everything shares
-one core library (`osint_core/`), and it's exposed two ways:
+one core library (`osint_core/`), and it's exposed three ways:
 
 - **`ohosint`** — a unified CLI and interactive shell: one command,
   subcommands per identifier type, async multi-site username sweeps against
   Maigret/Sherlock-format site databases, table or JSON output.
+- **`ohosint_mcp/`** — an [MCP](https://modelcontextprotocol.io/) server that
+  exposes the engine as tools, resources, and prompts so an LLM (Claude
+  Desktop, opencode, …) can run a fully-automated investigation.
 - **`skills/`** — three standalone scripts (an interactive recon shell and
   two adult-platform account finders), written as
   [Claude Code skills](https://docs.claude.com/) with their own `SKILL.md`
@@ -43,12 +46,24 @@ one core library (`osint_core/`), and it's exposed two ways:
 - **Phone**: E.164/national/international normalization, line-type and
   carrier lookup (via `phonenumbers`), ready-made search-engine dorks.
 - **Name**: username-candidate generation, identity dorks (LinkedIn,
-  Facebook, socials).
+  Facebook, socials), Wikipedia public-figure disambiguation.
 - **Username**: async sweep across a merged Maigret + Sherlock site
   database (thousands of sites when both are installed — see
   [Site databases](#site-databases-for-username-sweeps) below), with WAF
   detection, per-site error/regex rules, and confidence scoring against
   confirmed accounts.
+- **Domain**: passive subdomain enumeration from crt.sh, HackerTarget, and
+  AlienVault OTX (no brute-forcing, no touching the target's infra).
+- **Exposed docs**: a Maryam-style `docs` dork pack — filetype:, open-dir,
+  and cloud-bucket queries for a domain or name, run through every
+  configured search engine.
+- **Dark web**: `.onion` mention search via Ahmia (clearnet-reachable,
+  Tor-friendly).
+- **GitHub leaks**: code/commit/user search for an email or username
+  (code search needs `OHO_GITHUB_KEY`).
+- **Mentions & pivots**: autocomplete suggestions (Google/DDG/Bing),
+  Reddit + StackExchange mention search, and keyword-extraction
+  auto-dorking from any profile page.
 - **Breach search**: multi-source lookup for emails, usernames, domains,
   and passwords. Sources include LeakCheck, Hudson Rock Cavalier,
   XposedOrNot, HIBP breach catalogue / Pwned Passwords (k-anonymity),
@@ -69,6 +84,13 @@ ohosint/
 │   ├── constants.py            #   user-agents, not-found markers, platform URL templates
 │   ├── net.py                  #   Fetcher: session, UA rotation, delays, proxy
 │   ├── search.py                #   DuckDuckGo + Bing dorking, optional Google CSE engine
+│   ├── subdomains.py            #   passive subdomain enum (crt.sh / hackertarget / OTX)
+│   ├── docs.py                  #   exposed-files dork pack (filetype/buckets/open-dirs)
+│   ├── onion.py                 #   Ahmia dark-web search
+│   ├── github_leaks.py          #   GitHub code/commit/user leak search
+│   ├── suggest.py               #   autocomplete pivots + Wikipedia disambiguation
+│   ├── mentions.py              #   Reddit / StackExchange mention search
+│   ├── keywords.py              #   keyword extraction -> auto-dorking
 │   ├── probe.py                #   sync profile probing (used by skills/)
 │   ├── async_check.py          #   async site-checking engine (used by ohosint)
 │   ├── site_db.py              #   Maigret/Sherlock site-database loader
@@ -121,7 +143,68 @@ ohosint/
 scripts are kept because they run standalone from a path with a lighter
 dependency footprint (no async stack, no site databases) and each carries a
 `SKILL.md` documenting its method — useful as a reference, and as Claude Code
-skills. New work should target `ohosint`.
+skills. New work should target `ohosint`; `ohosint_mcp/` is the LLM-facing
+front end over the same library.
+
+## MCP server — automated LLM investigations
+
+`ohosint_mcp/` turns the whole toolkit into an [MCP](https://modelcontextprotocol.io/)
+server. An LLM client drives the investigation: it calls `osint_plan` to get a
+detailed phased plan, executes the granular tools, and loops the pivot phase
+until no new identifiers appear.
+
+Install it:
+
+```bash
+pip install -e .[mcp]            # adds fastmcp + the `ohosint-mcp` command
+ohosint-mcp                      # run over stdio
+fastmcp dev ohosint_mcp/server.py   # or open it in the MCP Inspector
+fastmcp run fastmcp.json            # or use the bundled fastmcp.json config
+```
+
+The server exposes:
+
+- **25 tools** — `osint_plan`, `run_investigation`, `investigate_email`,
+  `investigate_phone`, `investigate_name`, `sweep_username`, `breach_search`,
+  `enumerate_subdomains`, `hunt_docs`, `search_onion`, `github_leaks`,
+  `search_dork`, `suggest`, `mentions`, `autopsy_url`, `auto_dork_url`,
+  `generate_candidates`, `pivot_results`, plus OPSEC (`configure`,
+  `tor_check`, `rotate_tor_circuit`, `status`, `clear_session`).
+- **4 resources** — `skills://silent-recon`, `skills://silent-account-finder`,
+  `skills://tor-proxy`, and `skills://overview`.
+- **2 prompts** — `plan_investigation` and `run_osint_workflow`.
+
+Register it in **Claude Desktop** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "ohosint": {
+      "command": "ohosint-mcp"
+    }
+  }
+}
+```
+
+or in **opencode** (`opencode.json`):
+
+```json
+{
+  "mcp": {
+    "ohosint": {
+      "type": "local",
+      "command": ["ohosint-mcp"],
+      "enabled": true
+    }
+  }
+}
+```
+
+The MCP layer reuses `osint_core`/`ohosint.pipelines` unchanged, so every
+passivity guarantee, delay, and Tor feature above applies. Engine `print()`
+output is captured and returned as a `logs` field instead of corrupting the
+stdio transport. The same API-key env vars (`OHO_HIBP_KEY`, `OHO_GOOGLE_KEY`,
+`OHO_GITHUB_KEY`, …) unlock the keyed sources.
 
 ## Installation
 
@@ -182,9 +265,12 @@ and it's a sanctioned API rather than scraping, so no CAPTCHAs. Free tier is
 ```bash
 export OHO_GOOGLE_KEY=...        # Google Cloud API key (Custom Search enabled)
 export OHO_GOOGLE_CX=...         # Programmable Search Engine ID (cx)
+export OHO_GITHUB_KEY=...        # GitHub token — unlocks code search in `github`
 ```
 
-Without both set, the engine list stays DuckDuckGo + Bing and nothing changes.
+Without both Google vars set, the engine list stays DuckDuckGo + Bing and
+nothing changes. Without `OHO_GITHUB_KEY`, the `github` command still runs
+commit + user search (keyless, low rate limits) and skips code search.
 
 ### Optional: Tor
 
@@ -210,6 +296,12 @@ ohosint breach user@example.com     # multi-source breach search
 ohosint breach --type password 'hunter2'
 ohosint breach --type domain adobe.com
 ohosint name Jane Doe --year 1990
+ohosint domain example.com          # passive subdomain enum
+ohosint docs example.com            # exposed-files dork pack
+ohosint onion "someuser"            # dark-web search via Ahmia
+ohosint github user@example.com     # GitHub code/commit/user leak search
+ohosint suggest "jane doe"          # autocomplete pivots
+ohosint mentions someuser           # reddit / stackexchange mentions
 ohosint sites --db all              # see how many sites are loaded
 ohosint shell                       # interactive mode
 ```
@@ -258,9 +350,10 @@ Optional keyed sources: **HIBP account search**, **Intelligence X**,
 > socks5h://...` to hide your origin IP.
 
 Interactive shell commands: `email`, `phone`, `username`, `breach`, `name`,
-`sweep` (probe every candidate generated so far), `dork`, `autopsy`, `pivot`,
-`proxy`, `newnym`, `delay`, `status`, `save`, `clear`, `exit`. Run `help`
-inside the shell for the full list.
+`sweep` (probe every candidate generated so far), `dork`, `domain`, `docs`,
+`onion`, `github`, `suggest`, `mentions`, `autodork`, `autopsy`, `pivot`,
+`proxy`, `newnym`, `delay`, `insecure`, `status`, `save`, `clear`, `exit`.
+Run `help` inside the shell for the full list.
 
 ### `skills/` — standalone scripts
 

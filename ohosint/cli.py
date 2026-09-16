@@ -10,7 +10,7 @@ from typing import Optional
 
 import osint_core as oc
 
-from . import __version__, __longname__
+from . import __longname__, __version__
 from .config import Config
 from .output import OutputFormatter
 from .pipelines import (
@@ -116,6 +116,35 @@ def build_parser() -> argparse.ArgumentParser:
         "--db", choices=["maigret", "sherlock", "all"], default="all",
         help="Which database to inspect"
     )
+
+    # domain
+    domain_parser = subparsers.add_parser(
+        "domain", help="Passive subdomain enumeration (crt.sh/hackertarget/OTX)")
+    domain_parser.add_argument("domain", help="Domain to enumerate")
+
+    # docs
+    docs_parser = subparsers.add_parser(
+        "docs", help="Hunt exposed files with a filetype dork pack")
+    docs_parser.add_argument("target", help="Domain or name/keyword")
+
+    # onion
+    onion_parser = subparsers.add_parser("onion", help="Dark-web search via Ahmia")
+    onion_parser.add_argument("query", help="Search query")
+
+    # github
+    github_parser = subparsers.add_parser(
+        "github", help="GitHub code/commit/user leak search")
+    github_parser.add_argument("query", help="Email or username to search for")
+
+    # suggest
+    suggest_parser = subparsers.add_parser(
+        "suggest", help="Search-engine autocomplete pivots")
+    suggest_parser.add_argument("query", help="Seed query")
+
+    # mentions
+    mentions_parser = subparsers.add_parser(
+        "mentions", help="Posts/pages mentioning the identifier (reddit/SE)")
+    mentions_parser.add_argument("query", help="Email, username, or name")
 
     return parser
 
@@ -246,13 +275,18 @@ def handle_username(args, config: Config):
 
 
 def handle_name(args, config: Config):
-    report = run_name_pipeline(args.first, args.last, args.year)
+    fetcher = oc.Fetcher(proxy=config.proxy,
+                         delay=(config.delay_min, config.delay_max))
+    report = run_name_pipeline(args.first, args.last, args.year, fetcher=fetcher)
     formatter = OutputFormatter(use_rich=False)
 
     if config.format == "table":
         print(f"\nName: {report['name']}")
         print(f"Slug: {report['slug']}")
         print(f"\nCandidates: {', '.join(report['candidates'])}")
+        if report.get("public_figure_collision"):
+            print("  [!] exact Wikipedia title match — this name collides with a "
+                  "public figure; treat generic social hits with suspicion")
         print("\nSuggested dorks:")
         for label, dork in report["dorks"].items():
             print(f"  [{label}] {dork}")
@@ -297,6 +331,122 @@ def handle_shell(args, config: Config):
     shell.cmdloop()
 
 
+def _make_fetcher(config: Config) -> oc.Fetcher:
+    return oc.Fetcher(proxy=config.proxy,
+                      delay=(config.delay_min, config.delay_max))
+
+
+def handle_domain(args, config: Config):
+    report = oc.enum_subdomains(_make_fetcher(config), args.domain)
+    formatter = OutputFormatter(use_rich=False)
+    if config.format == "table":
+        print(f"\nDomain: {report['domain']}")
+        print(f"Sources: {report['sources']}")
+        for e in report["errors"]:
+            print(f"  [!] {e}")
+        subs = report["subdomains"]
+        print(f"Subdomains: {len(subs)}")
+        for s in subs:
+            print(f"  {s}")
+    else:
+        print(formatter.to_json([], metadata=report))
+    if config.out:
+        formatter.save_json([], config.out, metadata=report)
+        print(f"Report saved to {config.out}")
+
+
+def handle_docs(args, config: Config):
+    report = oc.hunt_docs(_make_fetcher(config), args.target)
+    formatter = OutputFormatter(use_rich=False)
+    if config.format == "table":
+        print(f"\nDocs hunt: {report['target']}")
+        total = 0
+        for entry in report["results"]:
+            hits = entry["hits"]
+            total += len(hits)
+            note = "  <-- engines throttled" if entry["throttled"] else ""
+            print(f"\n[{entry['label']}] {entry['query']}{note}")
+            for h in hits[:5]:
+                print(f"  {h['url']}  ({h['engine']})")
+        print(f"\nTotal hits: {total}")
+    else:
+        print(formatter.to_json([], metadata=report))
+    if config.out:
+        formatter.save_json([], config.out, metadata=report)
+        print(f"Report saved to {config.out}")
+
+
+def handle_onion(args, config: Config):
+    state, hits = oc.search_onion(_make_fetcher(config), args.query)
+    formatter = OutputFormatter(use_rich=False)
+    if config.format == "table":
+        print(f"\nAhmia state: {state}")
+        for h in hits:
+            print(f"  {h['title']}\n    {h['url']}")
+        if state is None:
+            print("  (request failed — try --tor or check your connection)")
+    else:
+        print(formatter.to_json([], metadata={"query": args.query,
+                                              "state": state, "hits": hits}))
+    if config.out:
+        formatter.save_json([], config.out,
+                            metadata={"query": args.query, "state": state, "hits": hits})
+        print(f"Report saved to {config.out}")
+
+
+def handle_github(args, config: Config):
+    report = oc.github_leaks(_make_fetcher(config), args.query)
+    formatter = OutputFormatter(use_rich=False)
+    if config.format == "table":
+        print(f"\nGitHub: {report['query']}  (token: {'yes' if report['keyed'] else 'no'})")
+        for e in report["errors"]:
+            print(f"  [!] {e}")
+        for section in ("code", "commits", "users"):
+            hits = report[section]
+            if not hits:
+                continue
+            print(f"\n{section}:")
+            for h in hits:
+                where = h.get("repo") or h.get("login", "")
+                print(f"  {h['url']}  {where}")
+    else:
+        print(formatter.to_json([], metadata=report))
+    if config.out:
+        formatter.save_json([], config.out, metadata=report)
+        print(f"Report saved to {config.out}")
+
+
+def handle_suggest(args, config: Config):
+    out = oc.suggest(_make_fetcher(config), args.query)
+    formatter = OutputFormatter(use_rich=False)
+    if config.format == "table":
+        print(f"\nSuggestions ({len(out['merged'])}):")
+        for s in out["merged"]:
+            print(f"  {s}")
+    else:
+        print(formatter.to_json([], metadata={"query": args.query, **out}))
+
+
+def handle_mentions(args, config: Config):
+    out = oc.mentions(_make_fetcher(config), args.query)
+    formatter = OutputFormatter(use_rich=False)
+    if config.format == "table":
+        for name, hits in out.items():
+            if hits is None:
+                print(f"\n[{name}] request failed")
+                continue
+            print(f"\n[{name}] {len(hits)} mention(s)")
+            for h in hits:
+                extra = h.get("subreddit") or f"score {h.get('score', 0)}"
+                print(f"  {h['title']}  ({extra})\n    {h['url']}")
+    else:
+        print(formatter.to_json([], metadata={"query": args.query, "sources": out}))
+    if config.out:
+        formatter.save_json([], config.out,
+                            metadata={"query": args.query, "sources": out})
+        print(f"Report saved to {config.out}")
+
+
 def main(argv: Optional[list] = None) -> int:
     """Main entry point for the ohosint CLI."""
     parser = build_parser()
@@ -321,6 +471,12 @@ def main(argv: Optional[list] = None) -> int:
         "breach": handle_breach,
         "sites": handle_sites,
         "shell": handle_shell,
+        "domain": handle_domain,
+        "docs": handle_docs,
+        "onion": handle_onion,
+        "github": handle_github,
+        "suggest": handle_suggest,
+        "mentions": handle_mentions,
     }
 
     try:
