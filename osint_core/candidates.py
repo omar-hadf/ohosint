@@ -35,17 +35,17 @@ def generate_candidates(local, year=None):
     out = {local.lower()}
     m = LOCAL_RE.match(local)
     if m:
-        f, l, n = m.group(1).lower(), (m.group(2) or "").lower(), (m.group(3) or "")
+        f, last, n = m.group(1).lower(), (m.group(2) or "").lower(), (m.group(3) or "")
         yrs = [n] if n else []
         if year:
             yrs += [str(year)[-2:], str(year)]
         for y in [None] + yrs:
             suf = y or ""
             for sp in ["", ".", "_", "-"]:
-                if l:
-                    out |= {f + sp + l + suf, l + sp + f + suf}
-                out |= {f + suf, f[0] + sp + l + suf if l else f + sp + suf,
-                        (f[:4] + suf), (l + suf) if l else ""}
+                if last:
+                    out |= {f + sp + last + suf, last + sp + f + suf}
+                out |= {f + suf, f[0] + sp + last + suf if last else f + sp + suf,
+                        (f[:4] + suf), (last + suf) if last else ""}
     return sorted({c for c in out
                    if len(c) >= 3 and c.isascii()
                    and not re.search(r"^[._-]|[._-]$", c)

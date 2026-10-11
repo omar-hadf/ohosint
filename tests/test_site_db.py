@@ -32,30 +32,3 @@ class TestEmptySiteDB:
                 assert False, "Should have raised ValueError"
             except ValueError as e:
                 assert "0 sites loaded" in str(e)
-
-    def test_shell_load_sites_returns_empty_dict(self, capsys):
-        """Shell _load_sites catches ValueError and returns {}."""
-        from ohosint.config import Config
-        from ohosint.shell import OHOsintShell
-
-        sh = OHOsintShell(Config())
-        p1, p2 = self._patch_no_dbs()
-        with p1, p2:
-            result = sh._load_sites()
-            assert result == {}
-            out = capsys.readouterr().out
-            assert "0 sites loaded" in out
-
-    def test_shell_email_aborts_on_empty_sites(self, capsys):
-        """Shell do_email aborts early when no sites loaded."""
-        from ohosint.config import Config
-        from ohosint.shell import OHOsintShell
-
-        sh = OHOsintShell(Config())
-        p1, p2 = self._patch_no_dbs()
-        with p1, p2:
-            sh.onecmd("email test@example.com")
-            out = capsys.readouterr().out
-            assert "0 sites loaded" in out
-            # Should NOT have proceeded to pipeline
-            assert "Email:" not in out

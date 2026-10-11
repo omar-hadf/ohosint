@@ -40,18 +40,6 @@ from .candidates import (
     simple_candidates,
     split_email,
 )
-from .cli import add_common_args, fetcher_from_args, save_report
-from .confidence import (
-    ORDER as CONFIDENCE_ORDER,
-)
-from .confidence import (
-    Anchors,
-    Confidence,
-    RankedEmail,
-    build_anchors,
-    rank_emails,
-    score,
-)
 from .constants import (
     NOT_FOUND_MARKERS,
     PHONE_TYPE,
@@ -62,7 +50,6 @@ from .constants import (
 )
 from .docs import doc_dorks, hunt_docs
 from .exclusions import fetch_exclusions, filter_excluded_sites
-from .executors import AsyncGeneratorExecutor, AsyncQueueExecutor, run_checks_parallel
 from .github_leaks import (
     github_code_search,
     github_commit_search,
@@ -83,13 +70,6 @@ from .keywords import auto_dorks, extract_keywords, extract_og_tags
 from .mentions import mentions, mentions_detailed, reddit_mentions, stackexchange_mentions
 from .net import Fetcher, build_session, polite, strip_tags, valid_proxy, warn_if_dns_leaking
 from .onion import search_onion
-from .patterns import (
-    count_patterns,
-    expand_patterns,
-    expand_patterns_random,
-    expand_wildcard,
-    expand_wildcard_all,
-)
 from .pivots import (
     EmailKind,
     EmailPivot,
@@ -126,7 +106,6 @@ __all__ = [
     "VERDICT_MARK",
     "Fetcher", "build_session", "polite", "strip_tags", "valid_proxy",
     "warn_if_dns_leaking",
-    "add_common_args", "fetcher_from_args", "save_report",
     "dork", "google_creds", "search_bing", "search_ddg", "search_google",
     "enum_subdomains", "valid_domain",
     "doc_dorks", "hunt_docs",
@@ -161,19 +140,11 @@ __all__ = [
     "MaigretSite", "MaigretEngine", "MaigretDatabase",
     "load_db", "load_default_db",
     "load_sherlock_db", "load_default_sherlock_db",
-    # executors
-    "AsyncQueueExecutor", "AsyncGeneratorExecutor", "run_checks_parallel",
     # pivots
     "Pivot", "PivotKind", "EmailPivot", "EmailKind",
     "extract_pivots", "select_pivots",
     "extract_email_pivots", "select_email_pivots",
     "rank_usernames", "resolve_url",
-    # confidence
-    "Confidence", "Anchors", "RankedEmail",
-    "build_anchors", "score", "rank_emails", "CONFIDENCE_ORDER",
-    # patterns
-    "expand_patterns", "expand_patterns_random", "count_patterns",
-    "expand_wildcard", "expand_wildcard_all",
     # exclusions
     "fetch_exclusions", "filter_excluded_sites",
 ]

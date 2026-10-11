@@ -269,7 +269,7 @@ def run_phone_pipeline(phone: str) -> Dict[str, Any]:
         report["e164"] = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
         report["international"] = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
         report["national"] = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL)
-        report["type"] = phonenumbers.number_type(parsed).__name__
+        report["type"] = oc.PHONE_TYPE.get(phonenumbers.number_type(parsed), "unknown")
         try:
             from phonenumbers.geocoder import description_for_number
             report["region"] = description_for_number(parsed, "en")
@@ -281,7 +281,7 @@ def run_phone_pipeline(phone: str) -> Dict[str, Any]:
         except Exception:
             pass
     except Exception as e:
-        report["valid"] = False
+        report.setdefault("valid", False)
         report["error"] = str(e)
         return report
 

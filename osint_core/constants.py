@@ -52,9 +52,9 @@ QUICK_SITES = ["telegram", "github", "reddit", "instagram", "tiktok",
 
 # phonenumbers.PhoneNumberType value -> human label.
 PHONE_TYPE = {
-    0: "unknown", 1: "fixed-line", 2: "mobile", 3: "fixed/mobile",
-    4: "toll-free", 5: "premium-rate", 6: "shared-cost", 7: "voip",
-    8: "personal", 9: "pager", 10: "uan", 11: "voicemail",
+    0: "fixed-line", 1: "mobile", 2: "fixed/mobile", 3: "toll-free",
+    4: "premium-rate", 5: "shared-cost", 6: "voip", 7: "personal",
+    8: "pager", 9: "uan", 10: "voicemail", 99: "unknown",
 }
 
 VERDICT_MARK = {"confirmed": "[+]", "probable": "[?]", "absent": "[-]",
